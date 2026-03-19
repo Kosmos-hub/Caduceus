@@ -10,7 +10,7 @@ A multi-town gossip and trade society simulator where economies, reputations, an
                |、˜〵          
                じしˍ,)ノ
 
-80 autonomous agents spread across 4 towns in 4 regions. Each one has a job, a personality, opinions about their neighbors, and goals they're trying to hit. There's one travelling Merchant Guild that physically moves town to town on a route — so if the merchant isn't in your town, you're stuck bartering with whoever's nearby.
+80 autonomous agents (automatically given Amazigh names from a generator) spread across 4 towns in 4 regions. Each one has a job, a personality, opinions about their neighbors, and goals they're trying to hit. There's one travelling Merchant Guild that physically moves town to town on a route — so if the merchant isn't in your town, you're stuck bartering with whoever's nearby.
 
 Nobody is scripted to cooperate or betray anyone. What happens — alliances, scams, debt spirals, reputation warfare, mass migration — comes from the interaction of simple individual rules.
 
@@ -78,4 +78,3 @@ town_portal.py   # [WIP] head-tracked 3D portal visualization
 - Political structures (elected town leaders, taxation)
 - Seasonal resource cycles
 - Event log export for post-run analysis
-- Language generation for agent names per-region (languagepy.py exists, just needs integration)
