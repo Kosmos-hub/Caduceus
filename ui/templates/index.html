@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Town Sim</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sand-100: #f5efe6;
+  --sand-200: #e8dcc8;
+  --sand-300: #d4c4a0;
+  --sand-400: #bfa97a;
+  --ink: #1a1408;
+  --ink-soft: #3d3222;
+  --ink-faint: #6b5d47;
+  --ink-ghost: #9e8e72;
+  --rust: #a0522d;
+  --rust-light: #c4764a;
+  --teal: #2a6b5e;
+  --teal-light: #3d9e8a;
+  --gold-accent: #c8a84e;
+  --red-accent: #8b3a3a;
+  --blue-accent: #3a5a8b;
+  --panel-bg: rgba(245, 239, 230, 0.92);
+  --panel-border: var(--sand-300);
+  --radius: 6px;
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', 'Consolas', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--sand-100);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 100vh;
+  /* parchment texture via CSS */
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(212,196,160,0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(191,169,122,0.2) 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 80%, rgba(200,168,78,0.08) 0%, transparent 60%);
+}
+
+/* ── header bar ──────────────────────────────────────── */
+
+#header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: linear-gradient(180deg, var(--ink) 0%, #2a2010 100%);
+  color: var(--sand-200);
+  border-bottom: 3px solid var(--gold-accent);
+  flex-wrap: wrap;
+}
+
+#header h1 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--sand-100);
+  margin-right: 16px;
+}
+
+.header-stat {
+  font-size: 12px;
+  color: var(--sand-300);
+  padding: 3px 10px;
+  border: 1px solid var(--ink-faint);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.04);
+}
+.header-stat b { color: var(--gold-accent); }
+
+.ctrl-btn {
+  padding: 5px 14px;
+  border: 1px solid var(--ink-faint);
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.06);
+  color: var(--sand-200);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  transition: all 0.15s;
+}
+.ctrl-btn:hover { background: rgba(255,255,255,0.12); border-color: var(--gold-accent); }
+.ctrl-btn.active { background: var(--rust); border-color: var(--rust-light); color: var(--sand-100); }
+
+.speed-btn { min-width: 36px; text-align: center; }
+.speed-btn.active { background: var(--teal); border-color: var(--teal-light); }
+
+/* ── tabs ────────────────────────────────────────────── */
+
+#tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 20px;
+  background: var(--ink);
+  border-bottom: 1px solid var(--ink-faint);
+}
+
+.tab-btn {
+  padding: 8px 18px;
+  border: none;
+  background: transparent;
+  color: var(--sand-300);
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+.tab-btn:hover { color: var(--sand-100); }
+.tab-btn.active {
+  color: var(--gold-accent);
+  border-bottom-color: var(--gold-accent);
+}
+
+/* ── town selector ───────────────────────────────────── */
+
+#town-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px 20px;
+  background: var(--sand-200);
+  border-bottom: 1px solid var(--sand-300);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.town-btn {
+  padding: 4px 14px;
+  border: 1px solid var(--sand-300);
+  border-radius: var(--radius);
+  background: var(--sand-100);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  transition: all 0.12s;
+}
+.town-btn:hover { border-color: var(--rust); color: var(--rust); }
+.town-btn.active {
+  background: var(--ink);
+  color: var(--gold-accent);
+  border-color: var(--ink);
+}
+.town-btn .eta { font-size: 10px; color: var(--ink-ghost); margin-left: 4px; }
+.town-btn.active .eta { color: var(--sand-400); }
+
+.region-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--sand-300);
+  border-radius: var(--radius);
+  background: var(--sand-100);
+  color: var(--ink-ghost);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.region-btn.active { background: var(--ink-soft); color: var(--gold-accent); border-color: var(--ink-soft); }
+
+/* ── main layout ─────────────────────────────────────── */
+
+#main {
+  display: flex;
+  gap: 0;
+  height: calc(100vh - 128px);
+  overflow: hidden;
+}
+
+#left-panel {
+  width: 480px;
+  min-width: 380px;
+  border-right: 1px solid var(--sand-300);
+  overflow-y: auto;
+  background: var(--panel-bg);
+}
+
+#right-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  background: var(--sand-100);
+}
+
+/* ── agent list (left panel) ─────────────────────────── */
+
+.agent-row {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  transition: background 0.1s;
+  font-size: 12px;
+  gap: 6px;
+}
+.agent-row:hover { background: var(--sand-200); }
+.agent-row.selected { background: var(--sand-300); }
+.agent-row .name { width: 130px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-row .job { width: 90px; color: var(--ink-faint); }
+.agent-row .cls { width: 50px; font-size: 11px; }
+.agent-row .gold { width: 70px; text-align: right; color: var(--rust); }
+.agent-row .food { width: 40px; text-align: right; color: var(--teal); }
+
+.cls-poor { color: var(--red-accent); }
+.cls-common { color: var(--ink-faint); }
+.cls-comfortable { color: var(--blue-accent); }
+.cls-elite { color: var(--gold-accent); font-weight: 600; }
+
+.list-header {
+  display: flex;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--ink-ghost);
+  border-bottom: 2px solid var(--sand-300);
+  background: var(--sand-200);
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.list-header span { cursor: pointer; }
+.list-header span:hover { color: var(--ink); }
+
+/* ── section titles ──────────────────────────────────── */
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--sand-300);
+}
+
+.sub-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: 14px 0 8px;
+}
+
+/* ── cards ────────────────────────────────────────────── */
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.card {
+  background: var(--sand-100);
+  border: 1px solid var(--sand-300);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.card-label { font-size: 11px; color: var(--ink-ghost); text-transform: uppercase; letter-spacing: 0.5px; }
+.card-value { font-size: 18px; font-weight: 500; color: var(--ink); margin-top: 2px; }
+.card-value.gold { color: var(--rust); }
+.card-value.pop { color: var(--teal); }
+
+/* ── market table ────────────────────────────────────── */
+
+.market-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.market-table th {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 2px solid var(--sand-300);
+  color: var(--ink-ghost);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.market-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+.market-table tr:hover { background: var(--sand-200); }
+.price-buy { color: var(--red-accent); }
+.price-sell { color: var(--teal); }
+
+/* ── agent detail ────────────────────────────────────── */
+
+.detail-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.detail-name {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+}
+.detail-meta { color: var(--ink-faint); font-size: 13px; }
+
+.trait-bar-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 3px 0;
+  font-size: 12px;
+}
+.trait-label { width: 100px; color: var(--ink-faint); }
+.trait-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--sand-200);
+  border-radius: 4px;
+  overflow: hidden;
+  max-width: 200px;
+}
+.trait-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.opinion-row {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  padding: 2px 0;
+}
+.opinion-name { width: 120px; }
+.opinion-bar-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+}
+.opinion-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--sand-200);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+.opinion-fill {
+  position: absolute;
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* ── events log ──────────────────────────────────────── */
+
+.event-row {
+  font-size: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+  display: flex;
+  gap: 8px;
+}
+.event-turn { color: var(--ink-ghost); min-width: 40px; }
+.event-text { color: var(--ink-soft); }
+
+/* ── chart containers ────────────────────────────────── */
+
+.chart-wrap {
+  background: var(--sand-100);
+  border: 1px solid var(--sand-300);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+/* ── tile map ────────────────────────────────────────── */
+
+#map-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(26, 20, 8, 0.92);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+#map-overlay.visible { display: flex; }
+#map-canvas {
+  border: 2px solid var(--gold-accent);
+  border-radius: var(--radius);
+  cursor: grab;
+  image-rendering: pixelated;
+}
+#map-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  background: var(--rust);
+  color: var(--sand-100);
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+#map-legend {
+  color: var(--sand-300);
+  font-size: 12px;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* ── scrollbar styling ───────────────────────────────── */
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--sand-200); }
+::-webkit-scrollbar-thumb { background: var(--sand-400); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-ghost); }
+
+/* ── tab panels ──────────────────────────────────────── */
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── detail sub-tabs ─────────────────────────────────── */
+.detail-tabs { display: flex; gap: 0; margin-bottom: 12px; }
+.detail-tab {
+  padding: 5px 14px;
+  border: 1px solid var(--sand-300);
+  background: var(--sand-100);
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+.detail-tab:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.detail-tab:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.detail-tab.active { background: var(--ink); color: var(--gold-accent); border-color: var(--ink); }
+
+/* ── inv grid ────────────────────────────────────────── */
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 4px;
+  font-size: 12px;
+}
+.inv-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 6px;
+  background: var(--sand-200);
+  border-radius: 3px;
+}
+.inv-qty { font-weight: 500; color: var(--ink); }
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+
+<div id="header">
+  <h1>Town Sim</h1>
+  <button class="ctrl-btn" id="btn-play" onclick="toggleRun()">&#9654; Play</button>
+  <button class="ctrl-btn" onclick="tickOnce()">Step</button>
+  <button class="speed-btn ctrl-btn active" data-speed="0.02">1</button>
+  <button class="speed-btn ctrl-btn" data-speed="0.8">2</button>
+  <button class="speed-btn ctrl-btn" data-speed="1.25">3</button>
+  <button class="speed-btn ctrl-btn" data-speed="8">4</button>
+  <button class="ctrl-btn" onclick="openMap()">Map</button>
+  <span class="header-stat">Turn <b id="hdr-turn">0</b></span>
+  <span class="header-stat">Merchant @ <b id="hdr-merchant">—</b></span>
+  <span class="header-stat">Market Gold <b id="hdr-mgold">0</b></span>
+</div>
+
+<!-- ═══ TABS ═════════════════════════════════════════════════ -->
+
+<div id="tabs">
+  <button class="tab-btn active" data-tab="overview">Overview</button>
+  <button class="tab-btn" data-tab="economy">Economy</button>
+  <button class="tab-btn" data-tab="people">People</button>
+  <button class="tab-btn" data-tab="events">Events</button>
+  <button class="tab-btn" data-tab="agent">Agent</button>
+</div>
+
+<!-- ═══ TOWN BAR ═════════════════════════════════════════════ -->
+
+<div id="town-bar"></div>
+
+<!-- ═══ MAIN ═════════════════════════════════════════════════ -->
+
+<div id="main">
+  <div id="left-panel">
+    <div class="list-header">
+      <span class="name" style="width:130px" data-sort="name">Name</span>
+      <span class="job" style="width:90px" data-sort="job">Job</span>
+      <span class="cls" style="width:50px" data-sort="class">Class</span>
+      <span style="width:70px;text-align:right" data-sort="gold">Gold</span>
+      <span style="width:40px;text-align:right" data-sort="food">Food</span>
+    </div>
+    <div id="agent-list"></div>
+  </div>
+
+  <div id="right-panel">
+
+    <!-- OVERVIEW -->
+    <div class="tab-panel active" id="panel-overview">
+      <div class="section-title">Region Overview</div>
+      <div class="card-grid" id="town-cards"></div>
+      <div class="chart-wrap">
+        <div class="sub-title">Price History</div>
+        <canvas id="chart-prices" height="220"></canvas>
+      </div>
+      <div class="chart-wrap">
+        <div class="sub-title">Wealth Distribution</div>
+        <canvas id="chart-wealth" height="180"></canvas>
+      </div>
+    </div>
+
+    <!-- ECONOMY -->
+    <div class="tab-panel" id="panel-economy">
+      <div class="section-title">Merchant Guild Market</div>
+      <div id="merchant-status" style="margin-bottom:12px;font-size:13px;"></div>
+      <table class="market-table" id="market-table">
+        <thead><tr><th>Good</th><th>Stock</th><th>Mid</th><th>Buy</th><th>Sell</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- PEOPLE (just shows the left list, right side is stats) -->
+    <div class="tab-panel" id="panel-people">
+      <div class="section-title">Population Stats</div>
+      <div id="pop-stats"></div>
+    </div>
+
+    <!-- EVENTS -->
+    <div class="tab-panel" id="panel-events">
+      <div class="section-title">Event Log</div>
+      <input type="text" id="event-search" placeholder="Filter events..." style="width:100%;padding:6px 10px;border:1px solid var(--sand-300);border-radius:var(--radius);font-family:var(--font-mono);font-size:12px;margin-bottom:10px;background:var(--sand-100);">
+      <div id="event-list" style="max-height:calc(100vh - 280px);overflow-y:auto;"></div>
+    </div>
+
+    <!-- AGENT DETAIL -->
+    <div class="tab-panel" id="panel-agent">
+      <div id="agent-detail-content">
+        <div style="color:var(--ink-ghost);padding:40px 0;text-align:center;">Click an agent on the left to inspect.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ MAP OVERLAY ══════════════════════════════════════════ -->
+
+<div id="map-overlay">
+  <button id="map-close" onclick="closeMap()">Close Map</button>
+  <canvas id="map-canvas" width="900" height="600"></canvas>
+  <div id="map-legend">Click a town node to zoom in. Scroll to zoom. Drag to pan. Agent dots colored by class.</div>
+</div>
+
+<!-- ═══ JAVASCRIPT ═══════════════════════════════════════════ -->
+
+<script>
+const socket = io();
+
+// ── state ───────────────────────────────────────────────
+
+let S = null;           // latest snapshot
+let selectedTown = 0;
+let selectedAgent = null;
+let agentDetail = null;
+let activeTab = "overview";
+let agentDetailTab = "profile";
+let sortKey = "gold";
+let sortDir = -1;       // -1 = descending
+let events = [];
+let isRunning = false;
+
+// price history ring buffer
+const priceHistory = {};
+const HIST_LEN = 200;
+const trackedGoods = ["food","wood","ore","tools","cloth","ingot","bread","scimitar"];
+trackedGoods.forEach(g => priceHistory[g] = []);
+
+// wealth history
+const wealthHistory = [];
+
+// ── socket handlers ─────────────────────────────────────
+
+socket.on("full_state", data => {
+  S = data;
+  // record price history
+  if (S.market) {
+    trackedGoods.forEach(g => {
+      const m = S.market[g];
+      if (m) {
+        priceHistory[g].push(m.mid);
+        if (priceHistory[g].length > HIST_LEN) priceHistory[g].shift();
+      }
+    });
+  }
+  // record wealth snapshot
+  if (S.agents) {
+    const golds = S.agents.map(a => a.gold).sort((a,b) => a-b);
+    const total = golds.reduce((s,v) => s+v, 0);
+    const top10 = golds.slice(-Math.ceil(golds.length*0.1)).reduce((s,v)=>s+v,0);
+    wealthHistory.push({ t: S.t, total, gini: giniCoeff(golds), top10pct: total>0 ? top10/total : 0 });
+    if (wealthHistory.length > HIST_LEN) wealthHistory.shift();
+  }
+  render();
+});
+
+socket.on("new_events", data => {
+  events.push(...data);
+  if (events.length > 2000) events = events.slice(-2000);
+  if (activeTab === "events") renderEvents();
+});
+
+socket.on("event_log", data => {
+  events = data;
+});
+
+socket.on("run_state", data => {
+  isRunning = data.running;
+  document.getElementById("btn-play").innerHTML = isRunning ? "&#9646;&#9646; Pause" : "&#9654; Play";
+  document.getElementById("btn-play").classList.toggle("active", isRunning);
+});
+
+socket.on("agent_detail", data => {
+  agentDetail = data;
+  renderAgentDetail();
+});
+
+// ── controls ────────────────────────────────────────────
+
+function toggleRun() { socket.emit("toggle_run"); }
+function tickOnce() { socket.emit("tick_once"); }
+function openMap() { document.getElementById("map-overlay").classList.add("visible"); drawMap(); }
+function closeMap() { document.getElementById("map-overlay").classList.remove("visible"); }
+
+document.querySelectorAll(".speed-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".speed-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    socket.emit("set_speed", { speed: parseFloat(btn.dataset.speed) });
+  });
+});
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.getElementById("panel-" + activeTab).classList.add("active");
+    render();
+  });
+});
+
+document.querySelectorAll(".list-header span").forEach(span => {
+  span.addEventListener("click", () => {
+    const key = span.dataset.sort;
+    if (!key) return;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = -1; }
+    renderAgentList();
+  });
+});
+
+// ── utility ─────────────────────────────────────────────
+
+function giniCoeff(sorted) {
+  const n = sorted.length;
+  if (n < 2) return 0;
+  let num = 0;
+  for (let i = 0; i < n; i++) num += (2*(i+1) - n - 1) * sorted[i];
+  const den = n * sorted.reduce((s,v) => s+v, 0);
+  return den > 0 ? num / den : 0;
+}
+
+function merchantEta(townId) {
+  if (!S) return 0;
+  const m = S.merchant_town_id;
+  const n = S.towns.length;
+  if (townId === m) return 0;
+  return townId > m ? townId - m : (n - m) + townId;
+}
+
+// ── render ──────────────────────────────────────────────
+
+let _lastTownBarTurn = -1;
+let _chartUpdateCounter = 0;
+
+function render() {
+  if (!S) return;
+
+  // header -- always cheap, just text
+  document.getElementById("hdr-turn").textContent = S.t;
+  document.getElementById("hdr-merchant").textContent = S.merchant_town_name;
+  document.getElementById("hdr-mgold").textContent = S.market_gold.toFixed(0);
+
+  // town bar -- only rebuild if towns changed (basically never)
+  if (_lastTownBarTurn < 0) { renderTownBar(); _lastTownBarTurn = S.t; }
+
+  // agent list -- always update (but uses smart DOM patching)
+  renderAgentList();
+
+  // active tab -- charts only every 4th frame to save GPU
+  _chartUpdateCounter++;
+  if (activeTab === "overview") renderOverview(_chartUpdateCounter % 4 === 0);
+  if (activeTab === "economy") renderEconomy();
+  if (activeTab === "people") renderPeople();
+  if (activeTab === "events") renderEvents();
+  // agent detail is only re-rendered on explicit request, not every tick
+}
+
+let _townBarBuilt = false;
+function renderTownBar() {
+  const bar = document.getElementById("town-bar");
+  if (!_townBarBuilt) {
+    let html = "";
+    for (let i = 0; i < S.num_regions; i++) {
+      html += `<button class="region-btn ${i===S.active_region?'active':''}" onclick="socket.emit('set_region',{region:${i}});selectedTown=0;_townBarBuilt=false;_agentListNames=[];_lastTownBarTurn=-1;setTimeout(()=>socket.emit('request_state'),100);">R${i+1}
+
+</button>`;
+    }
+    S.towns.forEach((t, i) => {
+      const eta = merchantEta(i);
+      const etaStr = eta === 0 ? "HERE" : eta + "d";
+      html += `<button class="town-btn ${i===selectedTown?'active':''}" data-town="${i}" onclick="selectedTown=${i};document.querySelectorAll('.town-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');render();">${t.name} <span class="eta" data-eta="${i}">${etaStr}</span></button>`;
+    });
+    bar.innerHTML = html;
+    _townBarBuilt = true;
+  } else {
+    // just update ETAs and active state
+    S.towns.forEach((t, i) => {
+      const eta = merchantEta(i);
+      const span = bar.querySelector(`[data-eta="${i}"]`);
+      if (span) span.textContent = eta === 0 ? "HERE" : eta + "d";
+    });
+  }
+}
+
+let _agentListNames = [];  // track current order to detect when rebuild is needed
+
+function renderAgentList() {
+  if (!S) return;
+  const list = document.getElementById("agent-list");
+  let agents = S.agents.filter(a => a.town_id === selectedTown);
+
+  agents.sort((a, b) => {
+    let va, vb;
+    if (sortKey === "name") { va = a.name; vb = b.name; return sortDir * va.localeCompare(vb); }
+    if (sortKey === "job") { va = a.job; vb = b.job; return sortDir * va.localeCompare(vb); }
+    if (sortKey === "class") { va = a.status; vb = b.status; }
+    else if (sortKey === "food") { va = a.food; vb = b.food; }
+    else { va = a.gold; vb = b.gold; }
+    return sortDir * (va - vb);
+  });
+
+  // check if we need a full rebuild (different agents or count changed)
+  const newNames = agents.map(a => a.name);
+  const needRebuild = newNames.length !== _agentListNames.length ||
+                      newNames.some((n, i) => n !== _agentListNames[i]);
+
+  if (needRebuild) {
+    _agentListNames = newNames;
+    list.innerHTML = agents.map(a => {
+      const sel = selectedAgent === a.name ? "selected" : "";
+      const cls = `cls-${a.social_class}`;
+      return `<div class="agent-row ${sel}" data-agent="${a.name}" onclick="selectAgent('${a.name}')">
+        <span class="name">${a.name}</span>
+        <span class="job">${a.job}</span>
+        <span class="cls ${cls}" data-f="cls">${a.social_class.slice(0,4)}</span>
+        <span class="gold" data-f="gold">${a.gold.toFixed(1)}</span>
+        <span class="food" data-f="food">${a.food}</span>
+      </div>`;
+    }).join("");
+  } else {
+    // fast path: just update the numbers in existing rows
+    const rows = list.children;
+    for (let i = 0; i < agents.length && i < rows.length; i++) {
+      const a = agents[i];
+      const row = rows[i];
+      const goldEl = row.querySelector('[data-f="gold"]');
+      const foodEl = row.querySelector('[data-f="food"]');
+      const clsEl = row.querySelector('[data-f="cls"]');
+      if (goldEl) goldEl.textContent = a.gold.toFixed(1);
+      if (foodEl) foodEl.textContent = a.food;
+      if (clsEl) {
+        clsEl.textContent = a.social_class.slice(0,4);
+        clsEl.className = `cls cls-${a.social_class}`;
+      }
+      // update selection highlight
+      row.classList.toggle("selected", selectedAgent === a.name);
+    }
+  }
+}
+
+function selectAgent(name) {
+  selectedAgent = name;
+  activeTab = "agent";
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelector('[data-tab="agent"]').classList.add("active");
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  document.getElementById("panel-agent").classList.add("active");
+  socket.emit("request_agent", { name });
+  renderAgentList();
+}
+
+// ── overview tab ────────────────────────────────────────
+
+function renderOverview(updateCharts) {
+  const grid = document.getElementById("town-cards");
+  grid.innerHTML = S.towns.map(t => {
+    const eta = merchantEta(t.town_id);
+    const etaStr = eta === 0 ? "<b style='color:var(--teal)'>HERE</b>" : eta + " days";
+    return `<div class="card">
+      <div class="card-label">${t.name}</div>
+      <div class="card-value pop">${t.pop} people</div>
+      <div style="font-size:11px;color:var(--ink-faint);margin-top:4px;">Resources: ${t.resources.join(", ")}</div>
+      <div style="font-size:11px;margin-top:2px;">Merchant: ${etaStr}</div>
+    </div>`;
+  }).join("");
+
+  if (updateCharts) {
+    updatePriceChart();
+    updateWealthChart();
+  }
+}
+
+// ── economy tab ─────────────────────────────────────────
+
+function renderEconomy() {
+  const status = document.getElementById("merchant-status");
+  const eta = merchantEta(selectedTown);
+  if (eta === 0) {
+    status.innerHTML = `<span style="color:var(--teal)">Merchant is <b>HERE</b> in ${S.towns[selectedTown].name}. Locals can trade.</span>`;
+  } else {
+    status.innerHTML = `<span style="color:var(--ink-ghost)">Merchant is away. ETA to ${S.towns[selectedTown].name}: ${eta} days.</span>`;
+  }
+
+  const tbody = document.querySelector("#market-table tbody");
+  const goods = Object.keys(S.market).sort((a,b) => S.market[b].stock - S.market[a].stock);
+  tbody.innerHTML = goods.map(g => {
+    const m = S.market[g];
+    return `<tr>
+      <td>${g}</td>
+      <td>${m.stock}</td>
+      <td>${m.mid.toFixed(2)}</td>
+      <td class="price-buy">${m.buy.toFixed(2)}</td>
+      <td class="price-sell">${m.sell.toFixed(2)}</td>
+    </tr>`;
+  }).join("");
+}
+
+// ── people tab ──────────────────────────────────────────
+
+function renderPeople() {
+  const div = document.getElementById("pop-stats");
+  const townAgents = S.agents.filter(a => a.town_id === selectedTown);
+  const classes = { poor: 0, common: 0, comfortable: 0, elite: 0 };
+  const jobs = {};
+  let totalGold = 0;
+  townAgents.forEach(a => {
+    classes[a.social_class] = (classes[a.social_class] || 0) + 1;
+    jobs[a.job] = (jobs[a.job] || 0) + 1;
+    totalGold += a.gold;
+  });
+
+  const golds = townAgents.map(a => a.gold).sort((a,b) => a-b);
+  const gini = giniCoeff(golds);
+
+  let html = `<div class="card-grid">
+    <div class="card"><div class="card-label">Population</div><div class="card-value pop">${townAgents.length}</div></div>
+    <div class="card"><div class="card-label">Total Gold</div><div class="card-value gold">${totalGold.toFixed(0)}</div></div>
+    <div class="card"><div class="card-label">Gini Index</div><div class="card-value">${gini.toFixed(3)}</div></div>
+    <div class="card"><div class="card-label">Avg Gold</div><div class="card-value gold">${townAgents.length > 0 ? (totalGold/townAgents.length).toFixed(1) : 0}</div></div>
+  </div>`;
+
+  html += `<div class="sub-title">Social Classes</div><div style="display:flex;gap:16px;margin-bottom:14px;">`;
+  Object.entries(classes).forEach(([c, n]) => {
+    html += `<span class="cls-${c}">${c}: ${n}</span>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="sub-title">Jobs</div><div class="inv-grid">`;
+  Object.entries(jobs).sort((a,b) => b[1]-a[1]).forEach(([j, n]) => {
+    html += `<div class="inv-item"><span>${j}</span><span class="inv-qty">${n}</span></div>`;
+  });
+  html += `</div>`;
+  div.innerHTML = html;
+}
+
+// ── events tab ──────────────────────────────────────────
+
+function renderEvents() {
+  const div = document.getElementById("event-list");
+  const q = (document.getElementById("event-search").value || "").toLowerCase();
+  let filtered = events;
+  if (q) filtered = events.filter(e => e.text.toLowerCase().includes(q));
+  const show = filtered.slice(-300).reverse();
+  div.innerHTML = show.map(e => `<div class="event-row"><span class="event-turn">t${e.t}</span><span class="event-text">${e.text}</span></div>`).join("");
+}
+document.getElementById("event-search").addEventListener("input", renderEvents);
+
+// ── agent detail tab ────────────────────────────────────
+
+function renderAgentDetail() {
+  const div = document.getElementById("agent-detail-content");
+  const a = agentDetail;
+  if (!a) {
+    div.innerHTML = `<div style="color:var(--ink-ghost);padding:40px 0;text-align:center;">Click an agent on the left to inspect.</div>`;
+    return;
+  }
+
+  let html = `<div class="detail-header">
+    <span class="detail-name">${a.name}</span>
+    <span class="detail-meta">${a.job} &middot; ${a.town_name} &middot; ${a.social_class}</span>
+  </div>`;
+
+  // sub-tabs
+  html += `<div class="detail-tabs">
+    <button class="detail-tab ${agentDetailTab==='profile'?'active':''}" onclick="agentDetailTab='profile';renderAgentDetail();">Profile</button>
+    <button class="detail-tab ${agentDetailTab==='brain'?'active':''}" onclick="agentDetailTab='brain';renderAgentDetail();">Brain</button>
+    <button class="detail-tab ${agentDetailTab==='history'?'active':''}" onclick="agentDetailTab='history';renderAgentDetail();">History</button>
+  </div>`;
+
+  if (agentDetailTab === "profile") {
+    html += `<div style="margin-bottom:12px;">
+      <span class="header-stat">Gold <b>${a.gold.toFixed(2)}</b></span>
+      <span class="header-stat">Status <b>${(a.status * 100).toFixed(0)}%</b></span>
+      <span class="header-stat">Friends <b>${a.friends.length}</b></span>
+      <span class="header-stat">Enemies <b>${a.enemies.length}</b></span>
+    </div>`;
+
+    // traits
+    html += `<div class="sub-title">Personality</div>`;
+    [["Honesty", a.honesty, "--teal"], ["Greed", a.greed, "--rust"], ["Sociability", a.sociability, "--blue-accent"], ["Vengefulness", a.vengefulness, "--red-accent"]].forEach(([label, val, color]) => {
+      html += `<div class="trait-bar-wrap">
+        <span class="trait-label">${label}</span>
+        <div class="trait-bar"><div class="trait-fill" style="width:${val*100}%;background:var(${color})"></div></div>
+        <span style="width:36px;text-align:right">${(val*100).toFixed(0)}%</span>
+      </div>`;
+    });
+
+    // tags
+    if (Object.keys(a.tags).length > 0) {
+      html += `<div class="sub-title">Tags</div><div style="display:flex;gap:6px;flex-wrap:wrap;">`;
+      Object.entries(a.tags).forEach(([tag, str]) => {
+        const color = tag === "SCAMMER" ? "var(--red-accent)" : tag === "RELIABLE" ? "var(--teal)" : "var(--ink-faint)";
+        html += `<span style="padding:2px 8px;border:1px solid ${color};border-radius:3px;font-size:11px;color:${color}">${tag} ${(str*100).toFixed(0)}%</span>`;
+      });
+      html += `</div>`;
+    }
+
+    // inventory
+    const invItems = Object.entries(a.inv).filter(([g,q]) => q > 0).sort((a,b) => b[1]-a[1]);
+    if (invItems.length > 0) {
+      html += `<div class="sub-title">Inventory</div><div class="inv-grid">`;
+      invItems.forEach(([g, q]) => {
+        html += `<div class="inv-item"><span>${g}</span><span class="inv-qty">x${q}</span></div>`;
+      });
+      html += `</div>`;
+    }
+
+    // goals
+    if (a.goals && a.goals.length > 0) {
+      html += `<div class="sub-title">Active Goals</div>`;
+      a.goals.filter(g => !g.resolved).forEach(g => {
+        const pct = g.qty > 0 ? Math.min(100, (g.have / g.qty) * 100) : 0;
+        html += `<div style="margin:4px 0;font-size:12px;">[${g.size}] ${g.good} x${g.qty} (have ${g.have}) due t=${g.deadline}
+          <div class="trait-bar" style="margin-top:2px"><div class="trait-fill" style="width:${pct}%;background:var(--teal)"></div></div>
+        </div>`;
+      });
+    }
+
+    // debts
+    if (Object.keys(a.debts_owed).length > 0) {
+      html += `<div class="sub-title">Debts</div>`;
+      Object.entries(a.debts_owed).forEach(([who, amt]) => {
+        html += `<div style="font-size:12px;">Owes <b>${who}</b>: ${amt.toFixed(2)}g</div>`;
+      });
+    }
+  }
+
+  else if (agentDetailTab === "brain") {
+    // opinions
+    html += `<div class="sub-title">Opinions</div>`;
+    if (a.opinions.length === 0) html += `<div style="font-size:12px;color:var(--ink-ghost)">None notable</div>`;
+    a.opinions.slice(0, 30).forEach(o => {
+      const pct = Math.abs(o.score);
+      const color = o.score > 0 ? "var(--teal)" : "var(--red-accent)";
+      const left = o.score > 0 ? "50%" : `${50 - pct/2}%`;
+      const width = `${pct/2}%`;
+      html += `<div class="opinion-row">
+        <span class="opinion-name">${o.name}</span>
+        <div class="opinion-bar-wrap">
+          <div class="opinion-bar"><div class="opinion-fill" style="left:${left};width:${width};background:${color}"></div></div>
+          <span style="width:36px;text-align:right;font-size:11px;color:${color}">${o.score > 0 ? '+' : ''}${o.score}</span>
+        </div>
+      </div>`;
+    });
+
+    // grudges
+    if (a.grudges.length > 0) {
+      html += `<div class="sub-title">Grudges</div>`;
+      a.grudges.forEach(g => {
+        html += `<div style="font-size:12px;margin:2px 0;"><b>${g.target}</b> str=${g.strength} — ${g.reason}</div>`;
+      });
+    }
+
+    // rumors known
+    if (a.rumors.length > 0) {
+      html += `<div class="sub-title">Rumors Known</div>`;
+      a.rumors.slice(0, 20).forEach(r => {
+        html += `<div style="font-size:12px;margin:2px 0;color:var(--ink-faint);">${r.subject} ${r.claim} (conf ${r.confidence})</div>`;
+      });
+    }
+  }
+
+  else if (agentDetailTab === "history") {
+    html += `<div class="sub-title">Recent Memories</div>`;
+    if (a.memories.length === 0) html += `<div style="font-size:12px;color:var(--ink-ghost)">None</div>`;
+    a.memories.forEach(m => {
+      html += `<div class="event-row"><span class="event-turn">t${m.t}</span><span style="width:80px;color:var(--ink-ghost)">${m.kind}</span><span class="event-text">${m.content}</span></div>`;
+    });
+  }
+
+  div.innerHTML = html;
+}
+
+// ── charts ──────────────────────────────────────────────
+
+let priceChart = null;
+let wealthChart = null;
+
+const chartColors = {
+  food: "#a0522d", wood: "#6b8e23", ore: "#708090", tools: "#8b7355",
+  cloth: "#9370db", ingot: "#b8860b", bread: "#d2691e", scimitar: "#4682b4"
+};
+
+function updatePriceChart() {
+  const ctx = document.getElementById("chart-prices");
+  if (!ctx) return;
+
+  const datasets = trackedGoods.map(g => ({
+    label: g,
+    data: priceHistory[g],
+    borderColor: chartColors[g] || "#888",
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    pointRadius: 0,
+    tension: 0.3,
+  }));
+
+  const labels = priceHistory.food.map((_, i) => i);
+
+  if (priceChart) {
+    priceChart.data.labels = labels;
+    priceChart.data.datasets = datasets;
+    priceChart.update("none");
+  } else {
+    priceChart = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11, family: "IBM Plex Mono" } } },
+        },
+        scales: {
+          x: { display: false },
+          y: { grid: { color: "rgba(0,0,0,0.06)" }, ticks: { font: { size: 10 } } },
+        },
+      },
+    });
+  }
+}
+
+function updateWealthChart() {
+  const ctx = document.getElementById("chart-wealth");
+  if (!ctx || wealthHistory.length < 2) return;
+
+  const labels = wealthHistory.map(w => w.t);
+  const datasets = [
+    { label: "Gini", data: wealthHistory.map(w => w.gini), borderColor: "#a0522d", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 0, tension: 0.3, yAxisID: "y" },
+    { label: "Top 10% share", data: wealthHistory.map(w => w.top10pct), borderColor: "#4682b4", backgroundColor: "transparent", borderWidth: 1.5, pointRadius: 0, tension: 0.3, yAxisID: "y" },
+  ];
+
+  if (wealthChart) {
+    wealthChart.data.labels = labels;
+    wealthChart.data.datasets = datasets;
+    wealthChart.update("none");
+  } else {
+    wealthChart = new Chart(ctx, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11, family: "IBM Plex Mono" } } },
+        },
+        scales: {
+          x: { display: false },
+          y: { min: 0, max: 1, grid: { color: "rgba(0,0,0,0.06)" }, ticks: { font: { size: 10 } } },
+        },
+      },
+    });
+  }
+}
+
+// ── tile map ────────────────────────────────────────────
+
+function drawMap() {
+  if (!S) return;
+  const canvas = document.getElementById("map-canvas");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+
+  ctx.fillStyle = "#1a1408";
+  ctx.fillRect(0, 0, W, H);
+
+  const n = S.towns.length;
+  if (n === 0) return;
+
+  // layout towns in a circle
+  const cx = W / 2, cy = H / 2, r = Math.min(W, H) * 0.32;
+  const townPos = S.towns.map((t, i) => {
+    const angle = (i / n) * Math.PI * 2 - Math.PI / 2;
+    return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), town: t };
+  });
+
+  // draw roads between adjacent towns
+  ctx.strokeStyle = "#3d3222";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    ctx.beginPath();
+    ctx.moveTo(townPos[i].x, townPos[i].y);
+    ctx.lineTo(townPos[j].x, townPos[j].y);
+    ctx.stroke();
+  }
+
+  // draw cross-roads (diagonals for 4 towns)
+  if (n === 4) {
+    ctx.strokeStyle = "#2a2010";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(townPos[0].x, townPos[0].y); ctx.lineTo(townPos[2].x, townPos[2].y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(townPos[1].x, townPos[1].y); ctx.lineTo(townPos[3].x, townPos[3].y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // draw merchant position on road
+  const mTown = S.merchant_town_id;
+  ctx.fillStyle = "#c8a84e";
+  ctx.beginPath();
+  ctx.arc(townPos[mTown].x, townPos[mTown].y - 28, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.font = "11px 'IBM Plex Mono'";
+  ctx.fillStyle = "#c8a84e";
+  ctx.textAlign = "center";
+  ctx.fillText("Merchant", townPos[mTown].x, townPos[mTown].y - 38);
+
+  // class colors
+  const classColor = { poor: "#8b3a3a", common: "#9e8e72", comfortable: "#3a5a8b", elite: "#c8a84e" };
+
+  // draw agent dots around each town
+  S.agents.forEach(a => {
+    if (a.traveling) return;
+    const tp = townPos[a.town_id];
+    if (!tp) return;
+    const ox = (a.pos[0] - 6) * 6;
+    const oy = (a.pos[1] - 4) * 6;
+    ctx.fillStyle = classColor[a.social_class] || "#9e8e72";
+    ctx.beginPath();
+    ctx.arc(tp.x + ox, tp.y + oy, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // draw traveling agents on roads
+  S.agents.forEach(a => {
+    if (!a.traveling) return;
+    const src = townPos[a.town_id];
+    const dst = townPos[a.travel_dst];
+    if (!src || !dst) return;
+    // lerp position
+    const totalDist = Math.max(1, Math.abs(a.travel_dst - a.town_id));
+    const progress = 1 - (a.travel_eta / totalDist);
+    const px = src.x + (dst.x - src.x) * Math.max(0, Math.min(1, progress));
+    const py = src.y + (dst.y - src.y) * Math.max(0, Math.min(1, progress));
+    ctx.fillStyle = "#d4c4a0";
+    ctx.beginPath();
+    ctx.arc(px, py, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // draw town nodes
+  townPos.forEach((tp, i) => {
+    const pop = tp.town.pop;
+    const nodeR = 14 + pop * 0.4;
+
+    // glow for selected
+    if (i === selectedTown) {
+      ctx.strokeStyle = "#c8a84e";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(tp.x, tp.y, nodeR + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = i === mTown ? "#2a6b5e" : "#3d3222";
+    ctx.beginPath();
+    ctx.arc(tp.x, tp.y, nodeR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "#6b5d47";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(tp.x, tp.y, nodeR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // town name
+    ctx.fillStyle = "#f5efe6";
+    ctx.font = "bold 13px 'Cormorant Garamond'";
+    ctx.textAlign = "center";
+    ctx.fillText(tp.town.name, tp.x, tp.y + 4);
+
+    // pop count
+    ctx.fillStyle = "#bfa97a";
+    ctx.font = "10px 'IBM Plex Mono'";
+    ctx.fillText(`pop ${pop}`, tp.x, tp.y + nodeR + 14);
+
+    // resources
+    ctx.fillStyle = "#6b5d47";
+    ctx.font = "9px 'IBM Plex Mono'";
+    ctx.fillText(tp.town.resources.join(", "), tp.x, tp.y + nodeR + 26);
+  });
+}
+
+</script>
+</body>
+</html>
